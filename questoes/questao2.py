@@ -1,4 +1,5 @@
 import pandas as pd
+from matplotlib import pyplot as plt #usado apenas para plotagem
 from sklearn.datasets import make_moons #usado apenas para gerar os dados da questão
 
 def questao2(n_samples: int = 500, noise: float = 0.06, eps: float = 0.2, min_samples: int = 5, random_state: int = 23) -> pd.DataFrame:
@@ -38,4 +39,15 @@ def questao2(n_samples: int = 500, noise: float = 0.06, eps: float = 0.2, min_sa
                     labels[j] = cluster_id
 
     df['cluster'] = labels
+
+    # Plotagem dos clusters
+    plt.figure(figsize=(6, 4))
+    scatter = plt.scatter(df['x'], df['y'], c=df['cluster'], cmap='tab10', s=20, alpha=0.8)
+    plt.title('DBSCAN Clusters — Two Moons')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.colorbar(scatter, label='Cluster ID')
+    plt.tight_layout()
+    plt.show()
+
     return df
