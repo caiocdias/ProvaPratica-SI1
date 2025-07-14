@@ -15,11 +15,18 @@ if __name__ == "__main__":
 
                     print("\nConjuntos de itens frequentes")
                     print(freq_sets.sort_values(by="support", ascending=False).head(10))
-                    print("\nPressione enter para escolher outra opção.")
+
+                    print("\nRegras de Associação")
+                    print(rules.sort_values(by="confidence", ascending=False).head(10))
+
+                    input("\nPressione enter para escolher outra opção.")
+
                 case 2:
-                    pass
+                    input("\nPressione enter para escolher outra opção.")
+
                 case 3:
-                    pass
+                    input("\nPressione enter para escolher outra opção.")
+
                 case 0:
                     print("\nSaindo...")
                     exit()
