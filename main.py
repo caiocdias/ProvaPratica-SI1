@@ -22,6 +22,8 @@ if __name__ == "__main__":
                     input("\nPressione enter para escolher outra opção.")
 
                 case 2:
+                    df_result = questao2(n_samples=500, noise=0.06, eps=0.2, min_samples=5, random_state=23)
+                    print(df_result.head())
                     input("\nPressione enter para escolher outra opção.")
 
                 case 3:
