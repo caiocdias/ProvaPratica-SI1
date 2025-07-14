@@ -1,4 +1,5 @@
 from questoes import *
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
@@ -24,6 +25,19 @@ if __name__ == "__main__":
                 case 2:
                     df_result = questao2(n_samples=500, noise=0.06, eps=0.2, min_samples=5, random_state=23)
                     print(df_result['cluster'].value_counts())
+                    x = df_result['x']
+                    y = df_result['y']
+                    clusters = df_result['cluster']
+
+                    plt.figure(figsize=(6, 4))
+                    scatter = plt.scatter(x, y, c=clusters, cmap='tab10', s=20, alpha=0.8)
+                    plt.title('DBSCAN Clusters — Two Moons')
+                    plt.xlabel('x')
+                    plt.ylabel('y')
+                    plt.colorbar(scatter, label='Cluster ID')
+                    plt.tight_layout()
+                    plt.show()
+
                     input("\nPressione enter para escolher outra opção.")
 
                 case 3:
