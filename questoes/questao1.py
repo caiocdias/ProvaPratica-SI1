@@ -1,131 +1,151 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
-def questao1(file_path, min_support=300, min_confidence=0.3):
-    df = pd.read_csv(file_path, header=None)
-    transactions = (
-        df.stack()
-          .groupby(level=0)
-          .apply(list)
-          .tolist()
-    )
+def load_transactions(filepath):
+    df = pd.read_csv(filepath, header=None)
+    transactions = df.apply(lambda row: [item for item in row if pd.notna(item)], axis=1).tolist()
+    return transactions
 
-    freq = {}
-    for trans in transactions:
-        for item in trans:
-            freq[item] = freq.get(item, 0) + 1
-    freq = {item: cnt for item, cnt in freq.items() if cnt >= min_support}
+class FPTreeNode:
+    def __init__(self, item_name, parent_node=None):
+        self.name = item_name
+        self.count = 1
+        self.parent = parent_node
+        self.children = {}
+        self.link = None
 
-    top_items = pd.DataFrame(
-        sorted(freq.items(), key=lambda x: x[1], reverse=True),
-        columns=['item', 'count']
-    )
+def count_items(transactions):
+    item_counts = {}
+    for txn in transactions:
+        for item in txn:
+            item_counts[item] = item_counts.get(item, 0) + 1
+    return item_counts
 
-    class FPNode:
-        def __init__(self, name, count, parent):
-            self.name = name
-            self.count = count
-            self.parent = parent
-            self.children = {}
-            self.link = None
+def build_tree(transactions, min_support):
+    freq = count_items(transactions)
+    freq = {item: sup for item, sup in freq.items() if sup >= min_support}
+    if not freq:
+        return None, None
 
-    header = {item: [cnt, None] for item, cnt in freq.items()}
-    root = FPNode(None, 1, None)
+    header = {item: [sup, None] for item, sup in freq.items()}
+    root = FPTreeNode(None)
 
-    def insert_tree(items, node, hdr):
-        if not items:
-            return
-        first, *rest = items
-        if first in node.children:
-            node.children[first].count += 1
-            child = node.children[first]
-        else:
-            child = FPNode(first, 1, node)
-            node.children[first] = child
-            # Atualiza links no header
-            if hdr[first][1] is None:
-                hdr[first][1] = child
+    for txn in transactions:
+        filtered = [it for it in txn if it in freq]
+        filtered.sort(key=lambda it: freq[it], reverse=True)
+        current = root
+        for it in filtered:
+            if it in current.children:
+                current.children[it].count += 1
             else:
-                current = hdr[first][1]
-                while current.link:
-                    current = current.link
-                current.link = child
-        insert_tree(rest, child, hdr)
+                node = FPTreeNode(it, current)
+                current.children[it] = node
+                if header[it][1] is None:
+                    header[it][1] = node
+                else:
+                    hp = header[it][1]
+                    while hp.link:
+                        hp = hp.link
+                    hp.link = node
+            current = current.children[it]
 
-    for trans in transactions:
-        valid = [itm for itm in trans if itm in freq]
-        valid.sort(key=lambda x: freq[x], reverse=True)
-        insert_tree(valid, root, header)
+    return root, header
+
+def extract_patterns(header, min_support):
+    def ascend(node):
+        path = []
+        while node.parent and node.parent.name is not None:
+            node = node.parent
+            path.append(node.name)
+        return path[::-1]
 
     patterns = []
 
-    def ascend(node):
-        path = []
-        while node and node.parent and node.parent.name:
-            node = node.parent
-            path.append(node.name)
-        return path
+    for item, (sup, node) in sorted(header.items(), key=lambda x: x[1][0]):
 
-    def find_prefix_paths(base):
-        paths = {}
-        node = header[base][1]
+        patterns.append((frozenset([item]), sup))
+
+        base_paths = []
         while node:
-            p = ascend(node)
-            if p:
-                paths[tuple(p)] = paths.get(tuple(p), 0) + node.count
+            prefix = ascend(node)
+            if prefix:
+                base_paths.extend([prefix] * node.count)
             node = node.link
-        return paths
 
-    def mine(prefix, hdr):
-        for item, (support, _) in sorted(hdr.items(), key=lambda x: x[1][0]):
-            new_pref = prefix + [item]
-            patterns.append((new_pref, support))
-            cond_paths = find_prefix_paths(item)
-            cond_txns = []
-            for p, cnt in cond_paths.items():
-                for _ in range(cnt):
-                    cond_txns.append(list(p))
-            new_freq = {}
-            for txn in cond_txns:
-                for itm in txn:
-                    new_freq[itm] = new_freq.get(itm, 0) + 1
-            new_freq = {itm: c for itm, c in new_freq.items() if c >= min_support}
-            if not new_freq:
-                continue
-            new_hdr = {itm: [c, None] for itm, c in new_freq.items()}
-            new_root = FPNode(None, 1, None)
-            for txn in cond_txns:
-                valid = [itm for itm in txn if itm in new_freq]
-                valid.sort(key=lambda x: new_freq[x], reverse=True)
-                insert_tree(valid, new_root, new_hdr)
-            mine(new_pref, new_hdr)
+        cond_root, cond_header = build_tree(base_paths, min_support)
+        if cond_header:
+            for pset, psup in extract_patterns(cond_header, min_support):
+                patterns.append((pset.union({item}), psup))
 
-    mine([], header)
+    return patterns
 
-    freq_itemsets = pd.DataFrame([
-        {'itemset': p, 'support': s} for p, s in patterns
-    ])
+def custom_combinations(items, r):
 
-    def powerset(items):
-        res = [[]]
-        for itm in items:
-            res += [r + [itm] for r in res]
-        return res
+    items = list(items)
+    n = len(items)
+    result = []
 
-    support_dict = {tuple(p): s for p, s in patterns}
+    def recurse(start, comb):
+        if len(comb) == r:
+            result.append(tuple(comb))
+            return
+        for i in range(start, n):
+            recurse(i+1, comb + [items[i]])
+
+    recurse(0, [])
+    return result
+
+def generate_rules(frequent_itemsets, min_confidence):
+
+    freq_dict = {fs: sup for fs, sup in frequent_itemsets}
     rules = []
-    for p, sup in patterns:
-        if len(p) > 1:
-            for ant in powerset(p):
-                if 0 < len(ant) < len(p):
-                    cons = [i for i in p if i not in ant]
-                    conf = sup / support_dict[tuple(ant)]
+    for itemset, sup in frequent_itemsets:
+        if len(itemset) < 2:
+            continue
+        for r in range(1, len(itemset)):
+            for ant in custom_combinations(itemset, r):
+                ant = frozenset(ant)
+                cons = itemset - ant
+                if freq_dict.get(ant, 0) > 0:
+                    conf = sup / freq_dict[ant]
                     if conf >= min_confidence:
-                        rules.append({
-                            'antecedent': ant,
-                            'consequent': cons,
-                            'support': sup,
-                            'confidence': conf
-                        })
-    rules_df = pd.DataFrame(rules)
+                        rules.append((ant, cons, sup, conf))
+    return rules
 
-    return top_items, freq_itemsets, rules_df
+def plot_graph(data, title, xlabel):
+
+    labels, values = zip(*data)
+
+    plt.figure(figsize=(12, 6))
+    bars = plt.barh(labels[::-1], values[::-1])
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.tight_layout()
+
+    for bar in bars:
+        w = bar.get_width()
+        plt.text(w + max(values)*0.01, bar.get_y() + bar.get_height()/2,
+                 str(int(w)), va='center')
+
+    plt.show()
+    plt.close()
+
+def questao1(file_path, min_support=300, min_confidence=0.3):
+    txns = load_transactions(file_path)
+    root, header = build_tree(txns, min_support)
+    freq_itemsets = extract_patterns(header, min_support) if header else []
+    rules_list = generate_rules(freq_itemsets, min_confidence)
+
+    indiv = sorted([(next(iter(fs)), sup) for fs, sup in freq_itemsets if len(fs) == 1],
+                   key=lambda x: -x[1])
+    multi = sorted([(tuple(fs), sup) for fs, sup in freq_itemsets if len(fs) > 1],
+                   key=lambda x: -x[1])
+
+    plot_graph(indiv[:15], f"Itens Mais Frequentes (sup ≥ {min_support})", "Suporte")
+    plot_graph([(" & ".join(x), sup) for x, sup in multi[:15]],
+               f"Conjuntos Frequentes (sup ≥ {min_support})", "Suporte")
+    plot_graph([(" → ".join(map(str,a)) + f" | sup {sup:.0f}; conf {conf:.2f}", conf)
+                for a, b, sup, conf in rules_list[:15]],
+               "Regras de Associação (conf ≥ {min_confidence})", "Confiança")
+
+    return indiv, multi, rules_list
