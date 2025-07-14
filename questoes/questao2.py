@@ -1,7 +1,6 @@
 import pandas as pd
 from sklearn.datasets import make_moons #usado apenas para gerar os dados da questão
 
-
 def questao2(n_samples: int = 500, noise: float = 0.06, eps: float = 0.2, min_samples: int = 5, random_state: int = 23) -> pd.DataFrame:
     X, _ = make_moons(n_samples=n_samples, noise=noise, random_state=random_state)
     df = pd.DataFrame(X, columns=['x', 'y'])
