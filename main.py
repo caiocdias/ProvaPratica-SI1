@@ -35,6 +35,9 @@ if __name__ == "__main__":
                     input("\nPressione enter para escolher outra opção.")
 
                 case 0:
+                    print("\"O correr da vida embrulha tudo, a vida é assim:")
+                    print("esquenta e esfria, aperta e dai afrouxa, sossega e depois desinquieta.")
+                    print("O que ela quer da gente é coragem.\" João Guimarães Rosa")
                     print("\nSaindo...")
                     exit()
                 case _:
